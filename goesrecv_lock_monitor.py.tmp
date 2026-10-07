@@ -418,3 +418,26 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    args = parse_args()
+    config = load_config(args.config)
+    if args.check_config:
+        print("Config OK")
+        return
+
+    shared = SharedState(config["lock"])
+    alerts = AlertWorker(config["email"])
+    alerts.start()
+    httpd = start_http_server(shared, config["http"])
+
+    try:
+        stats_loop(config, shared, alerts)
+    except KeyboardInterrupt:
+        print("Stopping", flush=True)
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+if __name__ == "__main__":
+    main()
