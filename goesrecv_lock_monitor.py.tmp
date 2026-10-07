@@ -178,3 +178,63 @@ class SharedState:
     def set_connected(self, connected: bool, error: str = "") -> None:
         with self.mutex:
             self.connected = connected
+            self.last_error = error
+
+    def update_stats(self, stats: dict[str, Any]) -> None:
+        with self.mutex:
+            self.latest_stats = stats
+            self.last_stats_time = now_text()
+            self.last_error = ""
+
+    def observe(self, raw_locked: bool) -> Optional[StateTransition]:
+        with self.mutex:
+            return self.machine.observe(raw_locked)
+
+    def snapshot(self) -> dict[str, Any]:
+        with self.mutex:
+            confirmed = self.machine.confirmed
+            return {
+                "connected": self.connected,
+                "normal": confirmed,
+                "locked": confirmed,  # legacy / operational alias used by the original API
+                "decoder_ok": self.latest_stats.get("ok"),
+                "reed_solomon_errors": self.latest_stats.get("reed_solomon_errors"),
+                "last_stats_time": self.last_stats_time,
+                "last_error": self.last_error,
+                "last_lost_lock_time": self.machine.last_lost,
+                "last_recovered_lock_time": self.machine.last_recovered,
+                "lost_lock_times": list(self.machine.lost_history),
+                "recovered_lock_times": list(self.machine.recovered_history),
+                "latest_stats": deepcopy(self.latest_stats),
+            }
+
+
+class AlertWorker(threading.Thread):
+    def __init__(self, config: dict[str, Any]):
+        super().__init__(name="alert-worker", daemon=True)
+        self.config = config
+        self.events: queue.Queue[StateTransition] = queue.Queue(maxsize=100)
+
+    def enqueue(self, transition: StateTransition) -> None:
+        if not self.config.get("enabled", False):
+            return
+        try:
+            self.events.put_nowait(transition)
+        except queue.Full:
+            print("Alert queue is full; dropping alert", flush=True)
+
+    def run(self) -> None:
+        while True:
+            transition = self.events.get()
+            try:
+                self._send_with_retry(transition)
+            finally:
+                self.events.task_done()
+
+    def _send_with_retry(self, transition: StateTransition) -> None:
+        attempts = max(1, int(self.config.get("max_attempts", 3)))
+        delay = 2
+        for attempt in range(1, attempts + 1):
+            try:
+                self._send(transition)
+                print(f"Alert sent: locked={transition.locked} at {transition.timestamp}", flush=True)
