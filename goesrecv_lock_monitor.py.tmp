@@ -238,3 +238,63 @@ class AlertWorker(threading.Thread):
             try:
                 self._send(transition)
                 print(f"Alert sent: locked={transition.locked} at {transition.timestamp}", flush=True)
+                return
+            except Exception as exc:
+                print(f"Alert attempt {attempt}/{attempts} failed: {exc}", flush=True)
+                if attempt < attempts:
+                    time.sleep(delay)
+                    delay = min(delay * 2, 30)
+
+    def _send(self, transition: StateTransition) -> None:
+        cfg = self.config
+        receivers = list(cfg.get("receivers", []))
+        sender = cfg.get("sender") or cfg.get("username")
+        username = cfg.get("username") or sender
+        password_env = cfg.get("password_env", "GOESRECV_MONITOR_SMTP_PASSWORD")
+        password = os.environ.get(password_env, "")
+
+        if not cfg.get("smtp_host") or not sender or not receivers:
+            raise RuntimeError("email is enabled but smtp_host/sender/receivers are incomplete")
+        if username and not password:
+            raise RuntimeError(f"SMTP password environment variable is empty: {password_env}")
+
+        state_text = "NORMAL RECEPTION RESTORED" if transition.locked else "RECEPTION ERROR DETECTED"
+        subject = f"{cfg.get('subject_prefix', 'Satellite signal status')} - {state_text}"
+        body = f"{state_text}\nTime: {transition.timestamp}\n"
+        msg = MIMEText(body, "plain", "utf-8")
+        display = cfg.get("display_name", "goesrecv lock monitor")
+        msg["From"] = f"{display} <{sender}>"
+        msg["To"] = ", ".join(receivers)
+        msg["Subject"] = subject
+
+        with smtplib.SMTP(cfg["smtp_host"], int(cfg.get("smtp_port", 587)), timeout=15) as smtp:
+            smtp.ehlo()
+            if cfg.get("starttls", True):
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
+            if username:
+                smtp.login(username, password)
+            smtp.sendmail(sender, receivers, msg.as_string())
+
+
+def reception_is_normal(stats: dict[str, Any]) -> bool:
+    """Return the original monitor's operational reception state.
+
+    Historical rule:
+        reed_solomon_errors == 0  -> normal reception
+        reed_solomon_errors != 0  -> error / degraded reception
+
+    This is intentionally stricter than goesrecv's own ``ok`` field:
+    a correctable packet can still have non-zero Reed-Solomon corrections
+    while ``ok`` remains true.
+    """
+    try:
+        return int(stats.get("reed_solomon_errors", -1)) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+
+def make_handler(shared: SharedState, http_config: dict[str, Any]):
+    cors_origin = str(http_config.get("cors_origin", ""))
+
