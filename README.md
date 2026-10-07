@@ -238,3 +238,123 @@ In `goesrecv-monitor` v1.3, the program treats the two indicators separately:
 
 This means a real decoder sample such as:
 
+```text
+reed_solomon_errors = 11
+ok = 1
+```
+
+appears as **LOCKED** in `goesrecv-monitor`, but at the same time visibly shows non-zero
+Reed-Solomon correction activity.
+
+That behavior provided the practical clue behind the original 2023 monitor: for unattended
+operation, "the decoder still has lock" was not the same thing as "reception is clean enough
+to treat as normal". The monitor therefore used the stricter operational criterion
+`reed_solomon_errors == 0`.
+
+This distinction is consistent with `goestools` itself: `ok` is true when the Reed-Solomon
+result is correctable (`rv >= 0`), whereas `reed_solomon_errors` reports how many bytes had to
+be corrected and uses `-1` for an uncorrectable packet.
+
+So the relationship is:
+
+```text
+upstream decoder / goesrecv-monitor:
+    ok == 1
+        -> packet remains correctable / decoder lock is retained
+
+original goesrecv_check operational rule:
+    reed_solomon_errors == 0
+        -> reception treated as Normal
+    reed_solomon_errors != 0
+        -> reception treated as Error / degraded
+```
+
+The public release keeps that historical distinction instead of collapsing both concepts
+into a single `ok` flag.
+
+## Original reception criterion retained
+
+The comments at the top of the original 2023 script preserve three real decoder-stat examples:
+
+```text
+Normal:
+reed_solomon_errors = 0,   ok = 1
+
+Error:
+reed_solomon_errors = -1,  ok = 0
+
+Error:
+reed_solomon_errors = 11,  ok = 1
+```
+
+That third sample is important. The original monitor was **not** simply mirroring goesrecv's
+`ok` field.
+
+In `goestools`, `reed_solomon_errors` is the number of bytes corrected by Reed-Solomon, and
+`-1` means the packet was not correctable. The decoder sets its own `ok` / lock flag when the
+Reed-Solomon result is `>= 0`. Therefore a packet can legitimately contain:
+
+```text
+reed_solomon_errors = 11
+ok = 1
+```
+
+meaning that the decoder still considers the packet correctable / locked, while the original
+monitor considers the reception abnormal because Reed-Solomon correction was already needed.
+
+For this project, the historical operational rule is therefore fixed as:
+
+```text
+reed_solomon_errors == 0   -> Normal reception
+reed_solomon_errors != 0   -> Error / degraded reception
+```
+
+The original comment says `Error(reed_solomon_errors>0)`, but one of the preserved error
+samples is `-1`; the public version therefore formalizes the actual observed behavior as
+**non-zero**, not merely `> 0`.
+
+This is intentionally stricter than upstream `ok`. The public release no longer presents
+`ok` as an equivalent selectable criterion, because doing so would miss the
+`reed_solomon_errors = 11, ok = 1` case that the original tool explicitly classified as an
+error.
+
+The HTTP status response still exposes both the confirmed monitor state and the raw upstream
+diagnostic values (`ok` and `reed_solomon_errors`) so users can see the distinction directly.
+
+## Protocol handling
+
+The decoder statistics connection uses the same 8-byte nanomsg/SP handshake visible in
+`goesrecv-monitor`:
+
+```text
+client -> server: 00 53 50 00 00 21 00 00
+server -> client: 00 53 50 00 00 20 00 00
+```
+
+Each statistics message is then read as an 8-byte nanomsg header followed by the exact message
+length declared in the header. The payload is newline-terminated JSON, for example fields such
+as:
+
+- `timestamp`
+- `skipped_symbols`
+- `viterbi_errors`
+- `reed_solomon_errors`
+- `ok`
+
+The public version uses exact-length socket reads rather than assuming one `recv()` call
+contains one complete message.
+
+## Configuration
+
+Copy the example:
+
+```bash
+cp config.example.json config.json
+```
+
+Important defaults:
+
+```json
+{
+  "goesrecv": {
+    "host": "127.0.0.1",
