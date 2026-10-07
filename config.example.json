@@ -1,0 +1,36 @@
+{
+  "goesrecv": {
+    "host": "127.0.0.1",
+    "decoder_port": 6002,
+    "socket_timeout_seconds": 10,
+    "reconnect_delay_seconds": 2
+  },
+  "lock": {
+    "loss_confirm_seconds": 5,
+    "recovery_confirm_seconds": 5,
+    "alert_cooldown_seconds": 60,
+    "history_limit": 500,
+    "notify_on_initial_state": false
+  },
+  "http": {
+    "enabled": true,
+    "bind": "127.0.0.1",
+    "port": 8083,
+    "cors_origin": ""
+  },
+  "email": {
+    "enabled": false,
+    "smtp_host": "smtp.office365.com",
+    "smtp_port": 587,
+    "starttls": true,
+    "username": "your-account@example.com",
+    "password_env": "GOESRECV_MONITOR_SMTP_PASSWORD",
+    "sender": "your-account@example.com",
+    "receivers": [
+      "you@example.com"
+    ],
+    "display_name": "goesrecv lock monitor",
+    "subject_prefix": "Satellite signal status",
+    "max_attempts": 3
+  }
+}
