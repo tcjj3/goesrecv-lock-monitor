@@ -201,7 +201,7 @@ class SharedState:
                 "reed_solomon_errors": self.latest_stats.get("reed_solomon_errors"),
                 "last_stats_time": self.last_stats_time,
                 "last_error": self.last_error,
-              "last_lost_lock_time": self.machine.last_lost,
+                "last_lost_lock_time": self.machine.last_lost,
                 "last_recovered_lock_time": self.machine.last_recovered,
                 "lost_lock_times": list(self.machine.lost_history),
                 "recovered_lock_times": list(self.machine.recovered_history),
@@ -267,81 +267,177 @@ class AlertWorker(threading.Thread):
         msg["To"] = ", ".join(receivers)
         msg["Subject"] = subject
 
-        with smtplib.SMTP(ÙY™ÖÈœÛ]ÚÜÝ—K[
-Ù™Ë™Ù]
-œÛ]ÜÜ‹NÊJK[Y[Ý]LMJH\ÈÛ]‚ˆÛ]™ZÊ
-BˆYˆÙ™Ë™Ù]
-œÝ\È‹YJN‚ˆÛ]œÝ\ÊÛÛ^\ÜÛ˜Ü™X]WÙY˜][ØÛÛ^
+        with smtplib.SMTP(cfg["smtp_host"], int(cfg.get("smtp_port", 587)), timeout=15) as smtp:
+            smtp.ehlo()
+            if cfg.get("starttls", True):
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
+            if username:
+                smtp.login(username, password)
+            smtp.sendmail(sender, receivers, msg.as_string())
 
-JBˆÛ]™ZÊ
-BˆYˆ\Ù\›˜[YN‚ˆÛ]›ÙÚ[Š\Ù\›˜[YK\ÜÝÛÜ™
-BˆÛ]œÙ[™XZ[
-Ù[™\‹™XÙZ]™\œË\ÙË˜\×ÜÝš[™Ê
-JB‚‚™Yˆ™XÙ\[Û—Ú\×Û›Ü›X[
-Ý]ÎˆXÝÜÝ‹[žWJHOˆ›ÛÛ‚ˆˆˆ”™]\›ˆHÜšYÚ[˜[[Ûš]Ü‰ÜÈÜ\˜][Û˜[™XÙ\[ÛˆÝ]K‚‚ˆ\ÝÜšXØ[[N‚ˆ™YYÜÛÛÛ[Û—Ù\œ›ÜœÈOHOˆ›Ü›X[™XÙ\[Û‚ˆ™YYÜÛÛÛ[Û—Ù\œ›ÜœÈOHOˆ\œ›ÜˆÈYÜ˜YY™XÙ\[Û‚‚ˆ\È\È[[[Û˜[HÝšXÝ\ˆ[ˆÛÙ\Ü™XÝ‰ÜÈÝÛˆÚØšY[‚ˆHÛÜœ™XÝX›HXÚÙ]Ø[ˆÝ[]™H›Û‹^™\›È™YYTÛÛÛ[ÛˆÛÜœ™XÝ[ÛœÂˆÚ[HÚØ™[XZ[œÈYK‚ˆˆˆ‚ˆžN‚ˆ™]\›ˆ[
-Ý]Ë™Ù]
-œ™YYÜÛÛÛ[Û—Ù\œ›ÜœÈ‹LJJHOHˆ^Ù\
-\Q\œ›Ü‹˜[YQ\œ›ÜŠN‚ˆ™]\›ˆ˜[ÙB‚‚‚™YˆXZÙWÚ[™\ŠÚ\™YˆÚ\™YÝ]KØÛÛ™šYÎˆXÝÜÝ‹[žWJN‚ˆÛÜœ×ÛÜšYÚ[ˆHÝŠØÛÛ™šYË™Ù]
-˜ÛÜœ×ÛÜšYÚ[ˆ‹ˆŠJB‚ˆÛ\ÜÈ[™\Š˜\ÙR™\]Y\Ý[™\ŠN‚ˆÙ\™\—Ý™\œÚ[ÛˆH™ÛÙ\Ü™XÝ‹[ØÚË[[Ûš]Ü‹ÌKŒ‚‚ˆYˆÚœÛÛŠÙ[‹Ý]\Îˆ[^[ØYˆ[žJHOˆ›Û™N‚ˆ]HHœÛÛ‹™[\Ê^[ØY[œÝ\™WØ\ØÚZOQ˜[ÙKÙ\\˜]ÜœÏJ‹‹ŽˆŠJK™[˜ÛÙJ]‹NŠBˆÙ[‹œÙ[™Ü™\ÜÛœÙJÝ]\ÊBˆÙ[‹œÙ[™ÚXY\ŠÛÛ[U\H‹˜\XØ][Û‹ÚœÛÛŽÈÚ\œÙ]]]‹NŠBˆÙ[‹œÙ[™ÚXY\ŠÛÛ[S[™Ý‹ÝŠ[Š]JJJBˆYˆÛÜœ×ÛÜšYÚ[Ž‚ˆÙ[‹œÙ[™ÚXY\ŠXØÙ\ÜËPÛÛ›ÛP[ÝËSÜšYÚ[ˆ‹ÛÜœ×ÛÜšYÚ[ŠBˆÙ[‹™[™ÚXY\œÊ
-BˆÙ[‹Ùš[KÜš]J]JB‚ˆYˆ×ÑÑU
-Ù[ŠHOˆ›Û™N‚ˆYˆÙ[‹œ]OH‹ÈŽ‚ˆÙ[‹œÙ[™Ü™\ÜÛœÙJÌŠBˆÙ[‹œÙ[™ÚXY\Š“ØØ][Ûˆ‹‹ÜÚYÛ˜[ŠBˆÙ[‹™[™ÚXY\œÊ
-Bˆ™]\›‚‚ˆÛ˜\ÚÝHÚ\™YœÛ˜\ÚÝ
 
-BˆYˆÙ[‹œ]OH‹ÙÛÙ\Ü™XÝˆŽ‚ˆÙ[‹—ÚœÛÛŠŒÛ˜\ÚÝÈ›]\ÝÜÝ]È—JBˆ™]\›‚ˆYˆÙ[‹œ][ˆÈ‹ÜÚYÛ˜[‹‹ÛØÚÈ‹‹ÜÚYÛ˜[ØÚÈŸN‚ˆÙ[‹—ÚœÛÛŠŒÂˆ˜ÛÛ›™XÝYŽˆÛ˜\ÚÝÈ˜ÛÛ›™XÝY—Kˆ››Ü›X[ŽˆÛ˜\ÚÝÈ››Ü›X[—Kˆ›ØÚÙYŽˆÛ˜\ÚÝÈ›ØÚÙY—Kˆ™XÛÙ\—ÛÚÈŽˆÛ˜\ÚÝÈ™XÛÙ\—ÛÚÈ—Kˆœ™YYÜÛÛÛ[Û—Ù\œ›ÜœÈŽˆÛ˜\ÚÝÈœ™YYÜÛÛÛ[Û—Ù\œ›ÜœÈ—Kˆ›\ÝÜÝØÚÕ[YHŽˆÛ˜\ÚÝÈ›\ÝÛÜÝÛØÚ×Ý[YH—Kˆ›\ÝÝXØÙ\ÜÓØÚÕ[YHŽˆÛ˜\ÚÝÈ›\ÝÜ™XÛÝ™\™YÛØÚ×Ý[YH—Kˆ›ÜÝØÚÕ[Y\ÈŽˆÛ˜\ÚÝÈ›ÜÝÛØÚ×Ý[Y\È—KˆœÝXØÙ\ÜÓØÚÕ[Y\ÈŽˆÛ˜\ÚÝÈœ™XÛÝ™\™YÛØÚ×Ý[Y\È—KˆJBˆ™]\›‚ˆYˆÙ[‹œ]OH‹ÚX[Ž‚ˆÙ[‹—ÚœÛÛŠŒYˆÛ˜\ÚÝÈ˜ÛÛ›™XÝY—H[ÙHLËÂˆ˜ÛÛ›™XÝYŽˆÛ˜\ÚÝÈ˜ÛÛ›™XÝY—Kˆ›\ÝÜÝ]×Ý[YHŽˆÛ˜\ÚÝÈ›\ÝÜÝ]×Ý[YH—Kˆ›\ÝÙ\œ›ÜˆŽˆÛ˜\ÚÝÈ›\ÝÙ\œ›Üˆ—KˆJBˆ™]\›‚‚ˆÙ[‹—ÚœÛÛŠÈ™\œ›ÜˆŽˆ››Ý›Ý[™ŸJB‚ˆYˆÙ×ÛY\ÜØYÙJÙ[‹›]ˆÝ‹
-˜\™ÜÎˆ[žJHOˆ›Û™N‚ˆ™]\›‚‚ˆ™]\›ˆ[™\‚‚‚™YˆÝ\ÚÜÙ\™\ŠÚ\™YˆÚ\™YÝ]KÛÛ™šYÎˆXÝÜÝ‹[žWJHOˆÜ[Û˜[Õ™XY[™ÒÙ\™\—N‚ˆYˆ›ÝÛÛ™šYË™Ù]
-™[˜X›Y‹YJN‚ˆ™]\›ˆ›Û™BˆY™\ÜÈH
-ÝŠÛÛ™šYË™Ù]
-˜š[™‹ŒLËŒŒŒHŠJK[
-ÛÛ™šYË™Ù]
-œÜ‹ÊJJBˆÙ\™\ˆH™XY[™ÒÙ\™\ŠY™\ÜËXZÙWÚ[™\ŠÚ\™YÛÛ™šYÊJBˆÙ\™\‹™Y[[Û—Ý™XYÈHYBˆ™XYH™XY[™Ë•™XY
-\™Ù]\Ù\™\‹œÙ\™WÙ›Ü™]™\‹˜[YOHš\Ù\™\ˆ‹Y[[ÛUYJBˆ™XYœÝ\
+def reception_is_normal(stats: dict[str, Any]) -> bool:
+    """Return the original monitor's operational reception state.
 
-Bˆš[
-ˆ’Ý]\ÈTH\Ý[š[™ÈÛˆØY™\ÜÖÌ_NžØY™\ÜÖÌW_H‹›\ÚUYJBˆ™]\›ˆÙ\™\‚‚‚™YˆÝ]×ÛÛÜ
-ÛÛ™šYÎˆXÝÜÝ‹[žWKÚ\™YˆÚ\™YÝ]K[\Îˆ[\ÛÜšÙ\ŠHOˆ›Û™N‚ˆØÙ™ÈHÛÛ™šYÖÈ™ÛÙ\Ü™XÝˆ—BˆÙ™ÈHÛÛ™šYÖÈ›ØÚÈ—BˆÜÝHÝŠØÙ™ÖÈšÜÝ—JBˆÜH[
-ØÙ™ÖÈ™XÛÙ\—ÜÜ—JBˆ[Y[Ý]H›Ø]
-ØÙ™Ë™Ù]
-œÛØÚÙ]Ý[Y[Ý]ÜÙXÛÛ™È‹LŒ
-JBˆ™XÛÛ›™XÝÙ[^HH›Ø]
-ØÙ™Ë™Ù]
-œ™XÛÛ›™XÝÙ[^WÜÙXÛÛ™È‹‹Œ
-JB‚ˆÚ[HYN‚ˆžN‚ˆš[
-ˆÛÛ›™XÝ[™ÈÈÛÙ\Ü™XÝˆXÛÙ\ˆÝ]È]ÚÜÝNžÜÜK‹‹ˆ‹›\ÚUYJBˆÚ]ÛØÚÙ]˜Ü™X]WØÛÛ›™XÝ[ÛŠ
-ÜÝÜ
-K[Y[Ý]][Y[Ý]
-H\ÈÛØÚÎ‚ˆÛØÚËœÙ][Y[Ý]
-[Y[Ý]
-BˆÛØÚËœÙ[™[
-“—ÒS’U
-Bˆ™\ÜÛœÙHH™XÝ—Ù^XÝ
-ÛØÚË
-BˆYˆ™\ÜÛœÙHOH“—Ô‘TÔÓ”ÑN‚ˆ˜Z\ÙH[[YQ\œ›ÜŠˆ[™^XÝY˜[›Û\ÙÈ[™ÚZÙH™\ÜÛœÙNˆÜ™\ÜÛœÙKš^
-	È	Ê_HŠB‚ˆÚ\™YœÙ]ØÛÛ›™XÝY
-YJBˆš[
-™ÛÙ\Ü™XÝˆXÛÙ\ˆÝ]ÈÛÛ›™XÝY‹›\ÚUYJB‚ˆÚ[HYN‚ˆXY\ˆH™XÝ—Ù^XÝ
-ÛØÚË
-Bˆ\Ù×Û[ˆHXY\–Í×BˆYˆ\Ù×Û[ˆOH‚ˆÛÛ[YBˆ^[ØYH™XÝ—Ù^XÝ
-ÛØÚË\Ù×Û[ŠBˆ^H^[ØY™XÛÙJ˜\ØÚZH‹\œ›ÜœÏHœÝšXÝŠKœœÝš\
-—ˆŠBˆÝ]ÈHœÛÛ‹›ØYÊ^
-BˆYˆ›Ý\Ú[œÝ[˜ÙJÝ]ËXÝ
-N‚ˆÛÛ[YB‚ˆÚ\™Y\]WÜÝ]ÊÝ]ÊBˆ˜[œÚ][ÛˆHÚ\™Y›ØœÙ\™J™XÙ\[Û—Ú\×Û›Ü›X[
-Ý]ÊJBˆYˆ˜[œÚ][Ûˆ\È›Ý›Û™N‚ˆÝ]HH““Ô“PS‘PÑTSÓˆ‘TÕÔ‘QˆYˆ˜[œÚ][Û‹›ØÚÙY[ÙH”‘PÑTSÓˆT”“ÔˆUPÕQ‚ˆš[
-ˆžÜÝ]_NˆÝ˜[œÚ][Û‹[Y\Ý[\H‹›\ÚUYJBˆ[\Ë™[œ]Y]YJ˜[œÚ][ÛŠB‚ˆ^Ù\Ù^X›Ø\™[\œ\‚ˆ˜Z\ÙBˆ^Ù\^Ù\[Ûˆ\È^Î‚ˆÚ\™YœÙ]ØÛÛ›™XÝY
-˜[ÙKÝŠ^ÊJBˆš[
-ˆ™ÛÙ\Ü™XÝˆÛÛ›™XÝ[Ûˆ\œ›ÜŽˆÙ^ßNÈ™]žZ[™È[ˆÜ™XÛÛ›™XÝÙ[^N™ß\È‹›\ÚUYJBˆ[YKœÛY\
-™XÛÛ›™XÝÙ[^JB‚‚™Yˆ\œÙWØ\™ÜÊ
-HOˆ\™Ü\œÙK“˜[Y\ÜXÙN‚ˆ\œÙ\ˆH\™Ü\œÙK\™Ý[Y[\œÙ\Š\ØÜš\[ÛH’XY\ÜÈÛÙ\Ü™XÝˆÚYÛ˜[[ØÚÈ[Ûš]Üˆ[™[\Ù\šXÙHŠBˆ\œÙ\‹˜YØ\™Ý[Y[
-‹KXÛÛ™šYÈ‹\OT]Y˜][T]
-˜ÛÛ™šYËšœÛÛˆŠK[H’”ÓÓˆÛÛ™šYÈ]ŠBˆ\œÙ\‹˜YØ\™Ý[Y[
-‹KXÚXÚËXÛÛ™šYÈ‹XÝ[ÛHœÝÜ™WÝYH‹[H˜[Y]HÛÛ™šYÈ[™^]ŠBˆ™]\›ˆ\œÙ\‹œ\œÙWØ\™ÜÊ
-B‚‚™YˆXZ[Š
-HOˆ›Û™N‚ˆ\™ÜÈH\œÙWØ\™ÜÊ
-BˆÛÛ™šYÈHØYØÛÛ™šYÊ\™ÜË˜ÛÛ™šYÊBˆYˆ\™ÜË˜ÚXÚ×ØÛÛ™šYÎ‚ˆš[
-ÛÛ™šYÈÒÈŠBˆ™]\›‚‚ˆÚ\™YHÚ\™YÝ]JÛÛ™šYÖÈ›ØÚÈ—JBˆ[\ÈH[\ÛÜšÙ\ŠÛÛ™šYÖÈ™[XZ[—JBˆ[\ËœÝ\
+    Historical rule:
+        reed_solomon_errors == 0  -> normal reception
+        reed_solomon_errors != 0  -> error / degraded reception
 
-BˆHÝ\ÚÜÙ\™\ŠÚ\™YÛÛ™šYÖÈš—JB‚ˆžN‚ˆÝ]×ÛÛÜ
-ÛÛ™šYËÚ\™Y[\ÊBˆ^Ù\Ù^X›Ø\™[\œ\‚ˆš[
-”ÝÜ[™È‹›\ÚUYJBˆš[˜[N‚ˆYˆ\È›Ý›Û™N‚ˆœÚ]ÝÛŠ
-BˆœÙ\™\—ØÛÜÙJ
-B‚‚šYˆ×Û˜[YW×ÈOH—×ÛXZ[—×ÈŽ‚ˆXZ[Š
-B
+    This is intentionally stricter than goesrecv's own ``ok`` field:
+    a correctable packet can still have non-zero Reed-Solomon corrections
+    while ``ok`` remains true.
+    """
+    try:
+        return int(stats.get("reed_solomon_errors", -1)) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+
+def make_handler(shared: SharedState, http_config: dict[str, Any]):
+    cors_origin = str(http_config.get("cors_origin", ""))
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "goesrecv-lock-monitor/1.0"
+
+        def _json(self, status: int, payload: Any) -> None:
+            data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            if cors_origin:
+                self.send_header("Access-Control-Allow-Origin", cors_origin)
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self) -> None:
+            if self.path == "/":
+                self.send_response(302)
+                self.send_header("Location", "/signal")
+                self.end_headers()
+                return
+
+            snapshot = shared.snapshot()
+            if self.path == "/goesrecv":
+                self._json(200, snapshot["latest_stats"])
+                return
+            if self.path in {"/signal", "/lock", "/signallock"}:
+                self._json(200, {
+                    "connected": snapshot["connected"],
+                    "normal": snapshot["normal"],
+                    "locked": snapshot["locked"],
+                    "decoder_ok": snapshot["decoder_ok"],
+                    "reed_solomon_errors": snapshot["reed_solomon_errors"],
+                    "lastLostLockTime": snapshot["last_lost_lock_time"],
+                    "lastSuccessLockTime": snapshot["last_recovered_lock_time"],
+                    "lostLockTimes": snapshot["lost_lock_times"],
+                    "successLockTimes": snapshot["recovered_lock_times"],
+                })
+                return
+            if self.path == "/health":
+                self._json(200 if snapshot["connected"] else 503, {
+                    "connected": snapshot["connected"],
+                    "last_stats_time": snapshot["last_stats_time"],
+                    "last_error": snapshot["last_error"],
+                })
+                return
+
+            self._json(404, {"error": "not found"})
+
+        def log_message(self, fmt: str, *args: Any) -> None:
+            return
+
+    return Handler
+
+
+def start_http_server(shared: SharedState, config: dict[str, Any]) -> Optional[ThreadingHTTPServer]:
+    if not config.get("enabled", True):
+        return None
+    address = (str(config.get("bind", "127.0.0.1")), int(config.get("port", 8083)))
+    server = ThreadingHTTPServer(address, make_handler(shared, config))
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, name="http-server", daemon=True)
+    thread.start()
+    print(f"HTTP status API listening on {address[0]}:{address[1]}", flush=True)
+    return server
+
+
+def stats_loop(config: dict[str, Any], shared: SharedState, alerts: AlertWorker) -> None:
+    gcfg = config["goesrecv"]
+    lcfg = config["lock"]
+    host = str(gcfg["host"])
+    port = int(gcfg["decoder_port"])
+    timeout = float(gcfg.get("socket_timeout_seconds", 10.0))
+    reconnect_delay = float(gcfg.get("reconnect_delay_seconds", 2.0))
+
+    while True:
+        try:
+            print(f"Connecting to goesrecv decoder stats at {host}:{port}...", flush=True)
+            with socket.create_connection((host, port), timeout=timeout) as sock:
+                sock.settimeout(timeout)
+                sock.sendall(NN_INIT)
+                response = recv_exact(sock, 8)
+                if response != NN_RESPONSE:
+                    raise RuntimeError(f"unexpected nanomsg handshake response: {response.hex(' ')}")
+
+                shared.set_connected(True)
+                print("goesrecv decoder stats connected", flush=True)
+
+                while True:
+                    header = recv_exact(sock, 8)
+                    msg_len = header[7]
+                    if msg_len == 0:
+                        continue
+                    payload = recv_exact(sock, msg_len)
+                    text = payload.decode("ascii", errors="strict").rstrip("\n")
+                    stats = json.loads(text)
+                    if not isinstance(stats, dict):
+                        continue
+
+                    shared.update_stats(stats)
+                    transition = shared.observe(reception_is_normal(stats))
+                    if transition is not None:
+                        state = "NORMAL RECEPTION RESTORED" if transition.locked else "RECEPTION ERROR DETECTED"
+                        print(f"{state}: {transition.timestamp}", flush=True)
+                        alerts.enqueue(transition)
+
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            shared.set_connected(False, str(exc))
+            print(f"goesrecv connection error: {exc}; retrying in {reconnect_delay:g}s", flush=True)
+            time.sleep(reconnect_delay)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Headless goesrecv signal-lock monitor and alert service")
+    parser.add_argument("--config", type=Path, default=Path("config.json"), help="JSON config path")
+    parser.add_argument("--check-config", action="store_true", help="validate config and exit")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    config = load_config(args.config)
+    if args.check_config:
+        print("Config OK")
+        return
+
+    shared = SharedState(config["lock"])
+    alerts = AlertWorker(config["email"])
+    alerts.start()
+    httpd = start_http_server(shared, config["http"])
+
+    try:
+        stats_loop(config, shared, alerts)
+    except KeyboardInterrupt:
+        print("Stopping", flush=True)
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+if __name__ == "__main__":
+    main()
