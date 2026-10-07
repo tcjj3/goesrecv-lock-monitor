@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""goesrecv lock monitor and alert service.
+
+Historical operational version: 2023-05 to 2023-06
+Public cleanup / hardening: 2026-10-08
+
+The 2023 version was used to monitor a rooftop GK-2A receiving system. This
+public version removes site-specific credentials and configuration, makes the
+nanomsg/TCP parsing explicit, and adds hysteresis/debouncing plus alert
+rate-limiting to prevent notification storms near the lock threshold.
+"""
+
+from __future__ import annotations
+
+import argparse
+from collections import deque
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime
+from email.mime.text import MIMEText
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import os
+from pathlib import Path
+import queue
+import smtplib
+import socket
+import ssl
+import threading
+import time
+from typing import Any, Optional
+
+NN_INIT = b"\x00\x53\x50\x00\x00\x21\x00\x00"
+NN_RESPONSE = b"\x00\x53\x50\x00\x00\x20\x00\x00"
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "goesrecv": {
+        "host": "127.0.0.1",
+        "decoder_port": 6002,
+        "socket_timeout_seconds": 10.0,
+        "reconnect_delay_seconds": 2.0,
+    },
+    "lock": {
+        "loss_confirm_seconds": 5.0,
+        "recovery_confirm_seconds": 5.0,
+        "alert_cooldown_seconds": 60.0,
+        "history_limit": 500,
+        "notify_on_initial_state": False,
+    },
+    "http": {
+        "enabled": True,
+        "bind": "127.0.0.1",
+        "port": 8083,
+        "cors_origin": "",
+    },
+    "email": {
+        "enabled": False,
+        "smtp_host": "smtp.office365.com",
+        "smtp_port": 587,
+        "starttls": True,
