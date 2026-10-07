@@ -358,3 +358,63 @@ def start_http_server(shared: SharedState, config: dict[str, Any]) -> Optional[T
     server = ThreadingHTTPServer(address, make_handler(shared, config))
     server.daemon_threads = True
     thread = threading.Thread(target=server.serve_forever, name="http-server", daemon=True)
+    thread.start()
+    print(f"HTTP status API listening on {address[0]}:{address[1]}", flush=True)
+    return server
+
+
+def stats_loop(config: dict[str, Any], shared: SharedState, alerts: AlertWorker) -> None:
+    gcfg = config["goesrecv"]
+    lcfg = config["lock"]
+    host = str(gcfg["host"])
+    port = int(gcfg["decoder_port"])
+    timeout = float(gcfg.get("socket_timeout_seconds", 10.0))
+    reconnect_delay = float(gcfg.get("reconnect_delay_seconds", 2.0))
+
+    while True:
+        try:
+            print(f"Connecting to goesrecv decoder stats at {host}:{port}...", flush=True)
+            with socket.create_connection((host, port), timeout=timeout) as sock:
+                sock.settimeout(timeout)
+                sock.sendall(NN_INIT)
+                response = recv_exact(sock, 8)
+                if response != NN_RESPONSE:
+                    raise RuntimeError(f"unexpected nanomsg handshake response: {response.hex(' ')}")
+
+                shared.set_connected(True)
+                print("goesrecv decoder stats connected", flush=True)
+
+                while True:
+                    header = recv_exact(sock, 8)
+                    msg_len = header[7]
+                    if msg_len == 0:
+                        continue
+                    payload = recv_exact(sock, msg_len)
+                    text = payload.decode("ascii", errors="strict").rstrip("\n")
+                    stats = json.loads(text)
+                    if not isinstance(stats, dict):
+                        continue
+
+                    shared.update_stats(stats)
+                    transition = shared.observe(reception_is_normal(stats))
+                    if transition is not None:
+                        state = "NORMAL RECEPTION RESTORED" if transition.locked else "RECEPTION ERROR DETECTED"
+                        print(f"{state}: {transition.timestamp}", flush=True)
+                        alerts.enqueue(transition)
+
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            shared.set_connected(False, str(exc))
+            print(f"goesrecv connection error: {exc}; retrying in {reconnect_delay:g}s", flush=True)
+            time.sleep(reconnect_delay)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Headless goesrecv signal-lock monitor and alert service")
+    parser.add_argument("--config", type=Path, default=Path("config.json"), help="JSON config path")
+    parser.add_argument("--check-config", action="store_true", help="validate config and exit")
+    return parser.parse_args()
+
+
+def main() -> None:
