@@ -118,3 +118,123 @@ RS > 0,   ok = 1  -> degraded but still correctable frame
 RS = -1,  ok = 0  -> uncorrectable frame / decoder lock lost
 ```
 
+This made the original monitoring goal clearer: it was not merely trying to duplicate
+goesrecv's decoder-lock flag. It was intended as an **early operational warning** for a
+rooftop antenna system, where the useful action was to notice degradation before a long run
+of weather imagery was lost.
+
+That is why the historical monitor used the stricter condition:
+
+```text
+reed_solomon_errors == 0  -> Normal
+reed_solomon_errors != 0  -> Error / degraded
+```
+
+The 2026 hardening keeps this historical sensitivity but adds dwell-time / hysteresis and
+alert cooldown so a marginal signal hovering near the threshold does not create a mail storm.
+
+## Why Viterbi errors can be high while reception is still normal
+
+The source code explains an important result from the original antenna-offset experiments:
+`viterbi_errors` and `reed_solomon_errors` are measuring different stages of a concatenated
+error-correction chain.
+
+In `goestools`, `Viterbi::compareSoft()` does **not** count residual payload errors after
+decoding. It re-encodes the Viterbi decoder's selected output and compares the resulting hard
+bits against the sign / MSB of the received soft symbols. In other words, the value is closer
+to a disagreement count between the noisy received convolutional-code stream and the codeword
+selected by the Viterbi decoder.
+
+That means a large `viterbi_errors` value can coexist with a perfectly recovered frame: the
+inner Viterbi decoder may be correcting a large amount of channel corruption while still
+producing the right bytes for the next stage.
+
+The packetizer then de-randomizes the decoded frame and runs the outer CCSDS Reed-Solomon
+decoder. `goestools` processes four interleaved 255-byte RS blocks (223 data + 32 parity per
+block). Its Reed-Solomon wrapper returns:
+
+```text
+0    -> no data-byte correction was required
+> 0  -> one or more data bytes were corrected successfully
+-1   -> at least one RS block was not correctable
+```
+
+The packetizer then defines its lock flag as:
+
+```cpp
+lock_ = (rv >= 0);
+details->ok = lock_;
+```
+
+So the experimental progression when slowly moving the antenna off-axis is expected to look
+roughly like this:
+
+```text
+good RF margin
+    -> low/moderate Viterbi disagreement
+    -> Viterbi fully reconstructs the frame
+    -> RS = 0
+    -> normal reception
+
+lower RF margin
+    -> Viterbi disagreement can become quite large
+    -> Viterbi still fully reconstructs the frame
+    -> RS = 0
+    -> reception can still remain normal
+
+near the FEC cliff
+    -> Viterbi occasionally leaves residual byte errors
+    -> RS starts correcting them
+    -> RS > 0, ok may still be 1
+    -> decoder still has a valid frame, but very little margin remains
+
+past the cliff
+    -> residual errors exceed the outer RS capability in a block
+    -> RS = -1
+    -> ok = 0
+    -> frame is not published as valid
+```
+
+This also explains an apparent contradiction in the 2023 observations: a sample with
+`reed_solomon_errors = 11, ok = 1` is not itself a corrupt output frame. That particular frame
+was still successfully repaired by Reed-Solomon. The practical problem is that once the link
+has degraded enough for non-zero RS correction to appear, nearby frames can rapidly alternate
+between "correctable" and "uncorrectable" as RF conditions fluctuate. For an image / file
+receive chain, losing only some frames is already enough to make sustained content reception
+nearly unusable.
+
+So the original `reed_solomon_errors == 0` threshold was conservative, but it had a strong
+empirical meaning: it detected the point where errors had begun to escape the inner Viterbi
+decoder and reach the outer code, rather than waiting until the decoder's binary `ok` flag
+finally dropped.
+
+### Interpreting the preserved samples
+
+For the Viterbi implementation used here, `compareSoft()` compares roughly one convolutionally
+encoded frame's worth of bits. The exact count is an implementation metric, not a BER
+measurement, but the preserved values illustrate the trend well:
+
+```text
+viterbi_errors =   27, RS =  0, ok = 1  -> strong / clean baseline
+viterbi_errors =  847, RS = 11, ok = 1  -> degraded, still correctable
+viterbi_errors = 2105, RS = -1, ok = 0  -> uncorrectable failure
+```
+
+The important experimental observation was broader than those three samples: during repeated
+slow antenna misalignment tests, `viterbi_errors` could become large while
+`reed_solomon_errors` remained zero and content reception was still normal. Once
+`reed_solomon_errors` became non-zero, useful reception was usually already close to failure.
+
+## How this criterion was derived from goesrecv-monitor
+
+The controlled receive test established the stricter reception-health rule. [`sam210723/goesrecv-monitor`](https://github.com/sam210723/goesrecv-monitor) then made the distinction visible in practice: its lock indicator and its Reed-Solomon statistic are displayed separately.
+
+In `goesrecv-monitor` v1.3, the program treats the two indicators separately:
+
+- the red/green `LOCKED` / `UNLOCKED` display comes directly from the decoder JSON `ok` field;
+- the Reed-Solomon correction count is read independently from `reed_solomon_errors` and is
+  displayed / plotted as a separate statistic;
+- the large-view background colour is also driven by `ok`, while the RS count remains visible.
+
+This means a real decoder sample such as:
+
