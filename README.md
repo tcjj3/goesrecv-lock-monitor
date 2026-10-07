@@ -358,3 +358,105 @@ Important defaults:
 {
   "goesrecv": {
     "host": "127.0.0.1",
+    "decoder_port": 6002
+  },
+  "lock": {
+    "loss_confirm_seconds": 5,
+    "recovery_confirm_seconds": 5,
+    "alert_cooldown_seconds": 60
+  },
+  "http": {
+    "bind": "127.0.0.1",
+    "port": 8083
+  }
+}
+```
+
+### E-mail credentials
+
+No SMTP password is stored in the repository or JSON config. Put it in the environment
+variable named by `email.password_env`:
+
+```bash
+export GOESRECV_MONITOR_SMTP_PASSWORD='your-password-or-app-password'
+```
+
+Then set `email.enabled` to `true` and fill in your SMTP username, sender and receivers in
+`config.json`.
+
+## Run
+
+Python 3.9+; no third-party Python packages are required.
+
+```bash
+python3 goesrecv_lock_monitor.py --config config.json
+```
+
+Validate configuration only:
+
+```bash
+python3 goesrecv_lock_monitor.py --config config.json --check-config
+```
+
+## HTTP API
+
+The API binds to `127.0.0.1` by default. Do not expose it publicly unless you intentionally
+configure network access and understand the security implications.
+
+Endpoints:
+
+- `/goesrecv` — latest raw decoder statistics JSON
+- `/signal`, `/lock`, `/signallock` — confirmed operational reception state and transition history; also includes raw upstream `ok` and `reed_solomon_errors` diagnostics
+- `/health` — goesrecv statistics-connection health
+
+Example `/signal` response:
+
+```json
+{
+  "connected": true,
+  "normal": true,
+  "locked": true,
+  "decoder_ok": 1,
+  "reed_solomon_errors": 0,
+  "lastLostLockTime": "2026-10-08T01:00:00+08:00",
+  "lastSuccessLockTime": "2026-10-08T01:01:00+08:00",
+  "lostLockTimes": [],
+  "successLockTimes": []
+}
+```
+
+## systemd
+
+An example unit is included in `systemd/goesrecv-lock-monitor.service`.
+
+Install to a suitable directory, create your private `config.json`, provide the SMTP password
+through an `EnvironmentFile` if e-mail is enabled, and adjust the paths in the unit before
+starting it.
+
+This replaces the original one-second shell polling watchdog with the operating system's
+native service restart mechanism.
+
+## About alert flapping
+
+The public defaults require five continuous seconds of the candidate state before confirming
+loss or recovery, plus a 60-second same-state alert cooldown. Both are configurable.
+
+That solves the specific failure mode that prevented the original project from being released:
+rapid lock / unlock oscillation near the RF threshold should no longer be able to generate a
+notification storm.
+
+This is still a monitoring aid, not a safety-critical alarm system. Thresholds should be tuned
+for the actual receiver and signal environment.
+
+## Relationship to upstream projects
+
+- [`sam210723/goestools`](https://github.com/sam210723/goestools) — goesrecv statistics source
+- [`sam210723/goesrecv-monitor`](https://github.com/sam210723/goesrecv-monitor) — reference
+  implementation for the statistics connection / nanomsg handshake
+
+No upstream source code is copied into this repository; the monitor communicates with the
+published statistics endpoint.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
