@@ -118,3 +118,63 @@ class LockStateMachine:
         self.confirmed: Optional[bool] = None
         self.candidate: Optional[bool] = None
         self.candidate_since: Optional[float] = None
+        self.last_alert_monotonic: dict[bool, float] = {True: float("-inf"), False: float("-inf")}
+        self.lost_history = deque(maxlen=limit)
+        self.recovered_history = deque(maxlen=limit)
+        self.last_lost = ""
+        self.last_recovered = ""
+
+    def observe(self, raw_locked: bool, monotonic_now: Optional[float] = None) -> Optional[StateTransition]:
+        now_mono = time.monotonic() if monotonic_now is None else monotonic_now
+
+        if self.confirmed is not None and raw_locked == self.confirmed:
+            self.candidate = None
+            self.candidate_since = None
+            return None
+
+        if self.candidate != raw_locked:
+            self.candidate = raw_locked
+            self.candidate_since = now_mono
+            return None
+
+        assert self.candidate_since is not None
+        required = self.recovery_confirm if raw_locked else self.loss_confirm
+        if now_mono - self.candidate_since < required:
+            return None
+
+        initial = self.confirmed is None
+        self.confirmed = raw_locked
+        self.candidate = None
+        self.candidate_since = None
+
+        stamp = now_text()
+        if initial:
+            if not self.notify_on_initial:
+                return None
+        else:
+            if raw_locked:
+                self.last_recovered = stamp
+                self.recovered_history.append(stamp)
+            else:
+                self.last_lost = stamp
+                self.lost_history.append(stamp)
+
+        if now_mono - self.last_alert_monotonic[raw_locked] < self.cooldown:
+            return None
+
+        self.last_alert_monotonic[raw_locked] = now_mono
+        return StateTransition(raw_locked, stamp)
+
+
+class SharedState:
+    def __init__(self, lock_config: dict[str, Any]):
+        self.mutex = threading.Lock()
+        self.machine = LockStateMachine(lock_config)
+        self.latest_stats: dict[str, Any] = {}
+        self.connected = False
+        self.last_stats_time = ""
+        self.last_error = ""
+
+    def set_connected(self, connected: bool, error: str = "") -> None:
+        with self.mutex:
+            self.connected = connected
